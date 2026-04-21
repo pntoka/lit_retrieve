@@ -40,6 +40,12 @@ python json_to_md.py \
     --save_dir /path/to/markdown/
 ```
 
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `--include_captions` | Append `## Figure Captions` and `## Table Captions` sections to each article |
+
 ### Extract keyword-matched sections
 
 ```bash

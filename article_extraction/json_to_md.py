@@ -65,7 +65,17 @@ def _sections_to_lines(sections: list, depth: int = 0) -> list[str]:
     return lines
 
 
-def json_to_md(json_path: str) -> str:
+def _captions_to_lines(label: str, captions: list) -> list[str]:
+    lines: list[str] = [f'## {label}', '']
+    for caption in captions:
+        text = str(caption).strip()
+        if text:
+            lines.append(text)
+            lines.append('')
+    return lines
+
+
+def json_to_md(json_path: str, include_captions: bool = False) -> str:
     """Read a single JSON article file and return its Markdown representation."""
     with open(json_path, 'r', encoding='utf-8') as fh:
         data = json.load(fh)
@@ -107,6 +117,16 @@ def json_to_md(json_path: str) -> str:
     if sections:
         lines.extend(_sections_to_lines(sections, depth=0))
 
+    # ── Captions (opt-in) ──────────────────────────────────────────────────
+    if include_captions:
+        figure_captions = data.get('Figure_captions', [])
+        if figure_captions:
+            lines.extend(_captions_to_lines('Figure Captions', figure_captions))
+
+        table_captions = data.get('Table_captions', [])
+        if table_captions:
+            lines.extend(_captions_to_lines('Table Captions', table_captions))
+
     # Ensure a single trailing newline
     md = '\n'.join(lines)
     if not md.endswith('\n'):
@@ -127,6 +147,12 @@ def main():
         '--save_dir',
         default=None,
         help='Directory to save Markdown files (default: <parent of data_dir>/markdown_articles)',
+    )
+    parser.add_argument(
+        '--include_captions',
+        action='store_true',
+        default=False,
+        help='Include Figure Captions and Table Captions sections in the Markdown output',
     )
     args = parser.parse_args()
 
@@ -166,7 +192,7 @@ def main():
         md_path = os.path.join(save_dir, md_filename)
 
         try:
-            md_content = json_to_md(json_path)
+            md_content = json_to_md(json_path, include_captions=args.include_captions)
             with open(md_path, 'w', encoding='utf-8') as fh:
                 fh.write(md_content)
             print(f"  OK  {filename}  →  {md_filename}")
