@@ -5,9 +5,10 @@ def rsc_captions(soup):
     '''RSC, MDPI'''
     captions = []
     for cap in soup.find_all(["td"], class_=lambda c: c and "image_title" in c.lower()):
-        captions.append(cap.get_text(strip=True))
+        captions.append(cap.get_text(strip=False).replace('\n', ' '))  # change to strip=False to preserve space between figure number and caption
+    # commenting this out as this returns table captions
     for cap in soup.find_all(["div", "p"], class_=lambda c: c and "caption" in c.lower()):
-        captions.append(cap.get_text(strip=True))
+        captions.append(cap.get_text(strip=False).replace('\n', ' '))  # change to strip=False to preserve space between figure number and caption
     captions = list(dict.fromkeys(captions))
     results = structure_figure_captions(captions)
     return results
@@ -15,7 +16,7 @@ def rsc_captions(soup):
 def tandf_captions(soup):
     captions = []
     for cap in soup.find_all(["div", "p"], class_=lambda c: c and "caption" in c.lower()):
-        captions.append(cap.get_text(strip=True))
+        captions.append(cap.get_text(strip=False).replace('\n', ' '))
     captions = list(dict.fromkeys(captions))
     results = structure_figure_captions(captions)
     return results
@@ -39,7 +40,8 @@ def acs_captions(soup):
     results = structure_figure_captions(captions)
     return results
 
-def nature_captions(soup):
+def springer_nature_captions(soup):
+    soup = soup.find('main') # have to use main body of article to avoid repetitions
     captions = []
     for cap in soup.find_all("figcaption"):
         figure = cap.parent
@@ -69,12 +71,34 @@ def science_captions(soup):
 
     return results
 
+def wiley_captions_xml(soup):
+    captions = []
+    for cap in soup.find_all('figure', attrs={'xml:id': True}):
+        title_tag = cap.find('title')
+        label = cap.get('xml:id')
+        processed_label = re.search(r'0*([1-9]\d*)$', label)
+        caption = cap.find('caption')
+        if label and caption:
+            text = title_tag.get_text(strip=True) + " " + processed_label.group(1) + " " + caption.get_text(strip=True)
+            captions.append(text)
+    for cap in soup.find_all('tabular', attrs={'xml:id': True}):
+        title_tag = cap.find('title')
+        label = cap.get('xml:id')
+        processed_label = re.search(r'0*([1-9]\d*)$', label)
+        text = "Table " + processed_label.group(1) + " " + title_tag.get_text(strip=True)
+        captions.append(text)
+    captions = list(dict.fromkeys(captions))
+    results = structure_figure_captions(captions)
+    return results
+
 def wiley_captions(soup):
+    if soup.find('component', attrs={'xml:id': True}) is not None:
+        return wiley_captions_xml(soup)
     captions = []
     for cap in soup.find_all(["header"], class_=lambda c: c and "caption" in c.lower()):
-        captions.append(cap.get_text(strip=True))
+        captions.append(cap.get_text(strip=False).replace('\n', ' '))  # change to strip=False to preserve space between figure number and caption
     for cap in soup.find_all("figcaption"):
-        text = cap.get_text(strip=True).replace('Open in figure viewerPowerPoint', '')
+        text = cap.get_text(strip=False).replace('Open in figure viewerPowerPoint', '').replace('\n', ' ') 
         captions.append(text)
     captions = list(dict.fromkeys(captions))
     results = structure_figure_captions(captions)
@@ -110,14 +134,17 @@ def elsevier_captions(soup):
 
 def concat_strings(captions):
     tables_caps = []
+    fig_caps = []
     for c in captions:
         if c.lower().startswith('table'):
             tables_caps.append(c.strip())
-
-    fig_caps = []
-    for c in captions:
-        if c not in tables_caps:
+        else:
             fig_caps.append(c.strip())
+
+    # fig_caps = []
+    # for c in captions:
+    #     if c not in tables_caps:
+    #         fig_caps.append(c.strip())
 
     return tables_caps, fig_caps
 
