@@ -88,14 +88,28 @@ def mdpi_table(soup):
         table_dicts.append(table_dict)
     return table_dicts
 
+def wiley_table_xml(soup):
+    tables = soup.find_all('tabular', attrs={'xml:id': True})
+    tables_dicts = []
+    for table in tables:
+        table_dict = {}
+        table_dict['content'] = str(table.find('table'))
+        label = table.get('xml:id')
+        table_dict['label'] = "Table " + re.search(r'0*([1-9]\d*)$', label).group(1)
+        tables_dicts.append(table_dict)
+    return tables_dicts
+
 def wiley_table(soup):
-    tables = soup.find_all('table', class_='article-section__table')
+    if soup.find('component', attrs={'xml:id': True}) is not None:
+        return wiley_table_xml(soup)
+    tables = soup.find_all('div', class_='article-table-content')
     table_dicts = []
     for table in tables:
         table_dict = {}
-        label = table.find_parent().find_previous_sibling('header').find('span').get_text().strip()
-        table_dict['label'] = label
-        table_dict['content'] = str(table)
+        table_content = str(table.find('table'))
+        table_dict['content'] = table_content
+        table_label = table.find('header').find('span').get_text().strip()
+        table_dict['label'] = table_label
         table_dicts.append(table_dict)
     return table_dicts
 

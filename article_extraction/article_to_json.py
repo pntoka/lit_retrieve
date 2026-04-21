@@ -74,10 +74,10 @@ def _get_captions(soup, publisher):
         "Frontiers":captions_extractor.acs_captions,   # same HTML pattern
         "RSC":      captions_extractor.rsc_captions,
         "MDPI":     captions_extractor.rsc_captions,   # same HTML pattern
-        "Nature":   captions_extractor.nature_captions,
+        "Nature":   captions_extractor.springer_nature_captions,
         "Science":  captions_extractor.science_captions,
         "Wiley":    captions_extractor.wiley_captions,
-        "Springer": captions_extractor.springer_captions,
+        "Springer": captions_extractor.springer_nature_captions,
         "TandF":    captions_extractor.tandf_captions,
         "Elsevier": captions_extractor.elsevier_captions,
     }
@@ -107,11 +107,11 @@ def _get_figure_urls(soup, publisher, figure_labels):
     dispatch = {
         "ACS":      figure_downloader.acs_figure,
         "RSC":      figure_downloader.rsc_figure,
-        "Nature":   figure_downloader.nature_figure,
+        "Nature":   figure_downloader.springer_nature_figure,
         "Science":  figure_downloader.science_figure,
         "MDPI":     figure_downloader.mdpi_figure,
         "Wiley":    figure_downloader.wiley_figure,
-        "Springer": figure_downloader.nature_figure,   # same function per figure_downloader
+        "Springer": figure_downloader.springer_nature_figure,   # same function per figure_downloader
         "TandF":    figure_downloader.tandf_figure,
         "Elsevier": figure_downloader.elsevier_figure,
     }

@@ -11,16 +11,15 @@ from bs4 import BeautifulSoup
 from PIL import Image
 
 
-def nature_figure(soup: BeautifulSoup, labels: list[str]) -> list[str]:
+def springer_nature_figure(soup: BeautifulSoup, labels: list[str]) -> list[str]:
     '''for nature and springer articles'''
     urls = []
     for l in labels:
         number = re.search(r'\d+', l).group()
-        l = f"Fig. {number}"
-        tag = soup.find('b', string=lambda text: text and l in text)
-        id = tag.get('id')
-        img = soup.find_all('img', attrs={"aria-describedby": id})
-        src = img[0].get('data-src')
+        l = f"figure-{number}-desc"
+        alt_l = f"Fig{number}"
+        img = soup.find('img', attrs={"aria-describedby": lambda text: text and (l or alt_l in text), "src": True})
+        src = img.get('src')
         url = urljoin('https://www.springernature.com/', src)
         full_image_url = re.sub(
             r'(?<=springernature\.com/).*?(?=/springer-static)',
@@ -107,9 +106,23 @@ def rsc_figure(soup, labels: list[str]) -> list[str | None]:
             continue   
     return urls
 
+def wiley_process_figure_labels(labels):
+    '''Function to create the correct fig and scheme ids from fig labels'''
+    ids = []
+    for lbl in labels:
+        if lbl.lower().startswith('fig'):
+            num = re.search(r'\d+', lbl).group()
+            ids.append(f'fig-000{num}')
+        elif lbl.lower().startswith('scheme'):
+            num = re.search(r'\d+', lbl).group()
+            ids.append(f'fig-500{num}')
+    return ids
+
 def wiley_figure(soup: BeautifulSoup, labels: list[str]) -> list[str]:
-    numbers = [int(re.search(r'\d+', s).group()) for s in labels]
-    ids = [f'fig-000{n}' for n in numbers]
+    if soup.find('component', attrs={'xml:id': True}) is not None:
+        urls = []  # cant get image links from xml format of articles so return empty list
+        return urls
+    ids = wiley_process_figure_labels(labels)
     urls = []
     for i in ids:
         figure = soup.find("figure", id=lambda t: t and f"{i}" in t)
@@ -128,12 +141,12 @@ def tandf_figure(soup: BeautifulSoup, labels: list[str]) -> list[str]:
     for l in labels:
         match = re.search(r'\d+', l)
         if l.lower().startswith('scheme'):
-            fig_id = f'sch000{match.group()}'
-            content = next(f["content"] for f in data["figures"] if f["id"] == fig_id)
+            num = match.group()   # sometimes the id is upper case, sometimes lowercase, so we check both
+            content = next(f["content"] for f in data["figures"] if f["id"].lower() == f'sch000{num}')
 
         elif l.lower().startswith('fig'):
-            fig_id = f'f000{match.group()}'
-            content = next(f["content"] for f in data["figures"] if f["id"] == fig_id)
+            num = match.group()
+            content = next(f["content"] for f in data["figures"] if f["id"].lower() == f'f000{num}')
         src = BeautifulSoup(content, "html.parser").img["src"]
         url = urljoin('https://www.tandfonline.com/', src)
         urls.append(url)
