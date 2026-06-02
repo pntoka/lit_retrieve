@@ -118,7 +118,7 @@ def doi_unique(query_list, save_dir):
     doi_list = []
     for query in query_list:
         folder = os.path.join(save_dir, list(query.keys())[0])
-        if os.path.exists(folder + "doi_all.txt") is False:
+        if os.path.exists(os.path.join(folder, "doi_all.txt")) is False:
             continue
         else:
             with open(os.path.join(folder, "doi_all.txt"), "r", encoding="utf-8") as file:
@@ -279,7 +279,7 @@ def doi_search_crossref(query_list, pub_dates, save_dir):
     for i, query in enumerate(query_list):
         save_dir_results = os.path.join(save_dir, f'query_{i+1}')
         os.mkdir(save_dir_results)
-        get_dois_crossref(query, pub_dates, save_dir_results)
+        get_dois_crossref(list(query.values())[0], pub_dates, save_dir_results)
         with open(os.path.join(save_dir_results, f"query_{i+1}.txt"), "w", encoding="utf-8") as f:
-            f.write(query)
+            f.write(list(query.values())[0])
         time.sleep(5)
