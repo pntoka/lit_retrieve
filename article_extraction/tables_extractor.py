@@ -39,18 +39,32 @@ def springer_table(soup)->list[dict]:
         table_dicts.append(table_dict)
     return table_dicts
 
-def rsc_table(soup):
-    tables = soup.find_all('table', class_='tgroup')
-    table_list = []
-    for table in tables:
-        table_dict = {}
-        label = table.find_parent('div', class_='rtable__wrapper') \
-                    .find_previous_sibling('div', class_='table_caption').find('b').text
-        table_dict['label'] = label
-        text = str(table)
-        table_dict['content'] = text
-        table_list.append(table_dict)
+# Old RSC table extractor (pre-2025 HTML layout, no longer works - RSC moved to Silverchair).
+# def rsc_table(soup):
+#     tables = soup.find_all('table', class_='tgroup')
+#     table_list = []
+#     for table in tables:
+#         table_dict = {}
+#         label = table.find_parent('div', class_='rtable__wrapper') \
+#                     .find_previous_sibling('div', class_='table_caption').find('b').text
+#         table_dict['label'] = label
+#         text = str(table)
+#         table_dict['content'] = text
+#         table_list.append(table_dict)
+#
+#     return table_list
 
+def rsc_table(soup):
+    '''RSC (Silverchair layout, 2024+)'''
+    table_list = []
+    for wrap in soup.find_all('div', class_='table-wrap'):
+        title = wrap.find('div', class_='table-wrap-title')
+        label = title.find('span', class_='label').get_text(strip=True) if title else None
+        overflow = wrap.find('div', class_='table-overflow')
+        table_el = overflow.find('table') if overflow else None
+        if table_el is None:
+            continue
+        table_list.append({'label': label, 'content': str(table_el)})
     return table_list
 
 def acs_table(soup):

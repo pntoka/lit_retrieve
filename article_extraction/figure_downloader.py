@@ -74,36 +74,67 @@ def acs_figure(soup, figure_labels: list[str]) -> list[str | None]:
     
     return urls
 
+# Old RSC figure extractor (pre-2025 HTML layout, no longer works - RSC moved to Silverchair).
+# def rsc_figure(soup, labels: list[str]) -> list[str | None]:
+#     urls = []
+#
+#     for label in labels:
+#         # Extract number from label (e.g., 'Fig. 1' -> '1', 'Scheme 2' -> '2')
+#         match = re.search(r'\d+', label)
+#         if not match:
+#             continue
+#
+#         num = match.group()
+#         src = None
+#
+#         # Determine if it's a Scheme or Figure and set the id accordingly
+#         if 'scheme' in label.lower():
+#             figure = soup.find('td', id=f"imgsch{num}")
+#             if figure:
+#                 img = figure.find('a')
+#                 if img:
+#                     src = img.get('href')
+#                     src = urljoin('https://pubs.rsc.org', src)
+#                     urls.append(src)
+#         elif 'fig' in label.lower():
+#             figure = soup.find('td', id=f"imgfig{num}")
+#             img = figure.find('a')
+#             if img:
+#                 src = img.get('href')
+#                 src = urljoin('https://pubs.rsc.org', src)
+#                 urls.append(src)
+#         else:
+#             continue
+#     return urls
+
 def rsc_figure(soup, labels: list[str]) -> list[str | None]:
+    '''RSC (Silverchair layout, 2024+)'''
     urls = []
-    
+
     for label in labels:
         # Extract number from label (e.g., 'Fig. 1' -> '1', 'Scheme 2' -> '2')
         match = re.search(r'\d+', label)
         if not match:
             continue
-        
+
         num = match.group()
-        src = None
-        
-        # Determine if it's a Scheme or Figure and set the id accordingly
+
+        # Determine if it's a Scheme or Figure and set the data-id accordingly
         if 'scheme' in label.lower():
-            figure = soup.find('td', id=f"imgsch{num}")
-            if figure:
-                img = figure.find('a')
-                if img:
-                    src = img.get('href')
-                    src = urljoin('https://pubs.rsc.org', src)
-                    urls.append(src)
+            data_id = f'sch{num}'
         elif 'fig' in label.lower():
-            figure = soup.find('td', id=f"imgfig{num}")
-            img = figure.find('a')
-            if img:
-                src = img.get('href')
-                src = urljoin('https://pubs.rsc.org', src)
-                urls.append(src)
+            data_id = f'fig{num}'
         else:
-            continue   
+            continue
+
+        figure = soup.find('div', class_='fig-section', attrs={'data-id': data_id})
+        src = None
+        if figure:
+            img = figure.find('img')
+            if img:
+                src = img.get('data-src')
+        urls.append(src)
+
     return urls
 
 def wiley_process_figure_labels(labels):
