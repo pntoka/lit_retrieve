@@ -2,6 +2,8 @@
 Functions to extract sections from html/xml files from different publishers
 '''
 
+import re
+
 import extractor_tools as tools
 
 def list_to_content_springer(list, list_remove):
@@ -439,4 +441,95 @@ def sections_mdpi(soup, list_remove):
         data_dict.append(data)
         if "Conclusions" in data['name']:
             break
+    return data_dict
+
+_RSC_EXCLUDE_HEADING_CLASSES = {
+    'backacknowledgements-title',
+    'backreferences-title',
+    'dataavailabilitystatement-title',
+}
+_RSC_EXCLUDE_HEADING_TEXT = re.compile(
+    r'^(acknowledge?ments?|(notes and )?references?|author contributions?|conflicts? of interest|data availability( statement)?)$',
+    re.IGNORECASE
+)
+
+def _rsc_excluded_heading(heading):
+    '''Back-matter headings (acknowledgements, references, etc.) to exclude from RSC sections'''
+    if _RSC_EXCLUDE_HEADING_CLASSES & set(heading.get('class', [])):
+        return True
+    return bool(_RSC_EXCLUDE_HEADING_TEXT.match(heading.get_text(strip=True)))
+
+def _rsc_paragraphs(content_div):
+    '''
+    Extract paragraph text from the article-section-wrapper children of a heading's
+    content div, skipping wrappers that hold a figure or table (handled separately)
+    '''
+    texts = []
+    for wrapper in content_div.find_all('div', class_='article-section-wrapper', recursive=False):
+        if wrapper.find('div', class_='fig-section') is not None:
+            continue
+        if wrapper.find('div', class_='table-wrap') is not None:
+            continue
+        for p in wrapper.find_all('p', recursive=False):
+            text = p.get_text(strip=True)
+            if text:
+                texts.append(text)
+    return texts
+
+def sections_rsc(soup):
+    '''
+    Function to extract sections from RSC html journals (Silverchair layout, 2024+).
+    Main content sits between div.article-metadata-panel and
+    div.permissionstatement-section-wrapper; h2/h3 headings are flat siblings each
+    followed by a sibling content div, so nesting is inferred from document order.
+    '''
+    metadata_panel = soup.find('div', class_='article-metadata-panel')
+    permission_wrapper = soup.find('div', class_='permissionstatement-section-wrapper')
+    parent = metadata_panel.parent
+    children = [c for c in parent.children if getattr(c, 'name', None) is not None]
+    start = children.index(metadata_panel)
+    end = children.index(permission_wrapper)
+    relevant = children[start + 1:end]
+
+    data_dict = []
+    current_h2 = None
+    current_h3 = None
+    skip_current = False
+
+    for node in relevant:
+        if node.name in ('h2', 'h3'):
+            skip_current = _rsc_excluded_heading(node)
+            if skip_current:
+                current_h3 = None
+                if node.name == 'h2':
+                    current_h2 = None
+                continue
+            section = {'name': node.get_text(strip=True), 'type': node.name, 'content': []}
+            if node.name == 'h2':
+                data_dict.append(section)
+                current_h2 = section
+                current_h3 = None
+            else:
+                target_list = current_h2['content'] if current_h2 is not None else data_dict
+                target_list.append(section)
+                current_h3 = section
+        elif node.name == 'div':
+            if skip_current:
+                continue
+            if 'article-section-wrapper' in node.get('class', []):
+                # standalone highlight box before any heading (e.g. "Broader context")
+                box_heading = node.find('h3', class_='title')
+                if box_heading is not None:
+                    section = {'name': box_heading.get_text(strip=True), 'type': 'h3', 'content': []}
+                    for p in box_heading.find_next_siblings('p'):
+                        text = p.get_text(strip=True)
+                        if text:
+                            section['content'].append(text)
+                    data_dict.append(section)
+                continue
+            target = current_h3 if current_h3 is not None else current_h2
+            if target is None:
+                continue
+            target['content'].extend(_rsc_paragraphs(node))
+
     return data_dict

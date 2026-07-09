@@ -73,7 +73,7 @@ def _get_captions(soup, publisher):
         "ACS":      captions_extractor.acs_captions,
         "Frontiers":captions_extractor.acs_captions,   # same HTML pattern
         "RSC":      captions_extractor.rsc_captions,
-        "MDPI":     captions_extractor.rsc_captions,   # same HTML pattern
+        "MDPI":     captions_extractor.mdpi_captions,   # same HTML pattern (RSC moved to a new layout)
         "Nature":   captions_extractor.springer_nature_captions,
         "Science":  captions_extractor.science_captions,
         "Wiley":    captions_extractor.wiley_captions,

@@ -1,14 +1,51 @@
 from bs4 import BeautifulSoup
 import re
 
-def rsc_captions(soup):
-    '''RSC, MDPI'''
+def mdpi_captions(soup):
+    '''MDPI (old RSC/MDPI shared HTML pattern - RSC moved to a new layout, see rsc_captions below)'''
     captions = []
     for cap in soup.find_all(["td"], class_=lambda c: c and "image_title" in c.lower()):
         captions.append(cap.get_text(strip=False).replace('\n', ' '))  # change to strip=False to preserve space between figure number and caption
     # commenting this out as this returns table captions
     for cap in soup.find_all(["div", "p"], class_=lambda c: c and "caption" in c.lower()):
         captions.append(cap.get_text(strip=False).replace('\n', ' '))  # change to strip=False to preserve space between figure number and caption
+    captions = list(dict.fromkeys(captions))
+    results = structure_figure_captions(captions)
+    return results
+
+# Old RSC captions extractor (pre-2025 HTML layout, no longer works - RSC moved to Silverchair).
+# Shared with MDPI, which still uses this HTML pattern - see mdpi_captions above.
+# def rsc_captions(soup):
+#     '''RSC, MDPI'''
+#     captions = []
+#     for cap in soup.find_all(["td"], class_=lambda c: c and "image_title" in c.lower()):
+#         captions.append(cap.get_text(strip=False).replace('\n', ' '))
+#     for cap in soup.find_all(["div", "p"], class_=lambda c: c and "caption" in c.lower()):
+#         captions.append(cap.get_text(strip=False).replace('\n', ' '))
+#     captions = list(dict.fromkeys(captions))
+#     results = structure_figure_captions(captions)
+#     return results
+
+def rsc_captions(soup):
+    '''RSC (Silverchair layout, 2024+)'''
+    captions = []
+    for fig in soup.find_all('div', class_='fig-section'):
+        if fig.get('data-id') == 'ga':
+            continue  # skip graphical/visual abstract
+        label = fig.find('div', class_='fig-label')
+        cap = fig.find('div', class_='fig-caption')
+        if label is None or cap is None:
+            continue
+        captions.append(label.get_text(strip=True) + ' ' + cap.get_text(strip=True))
+    for wrap in soup.find_all('div', class_='table-wrap'):
+        title = wrap.find('div', class_='table-wrap-title')
+        if title is None:
+            continue
+        label = title.find('span', class_='label')
+        cap = title.find('div', class_='caption')
+        if label is None or cap is None:
+            continue
+        captions.append(label.get_text(strip=True) + ' ' + cap.get_text(strip=True))
     captions = list(dict.fromkeys(captions))
     results = structure_figure_captions(captions)
     return results

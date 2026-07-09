@@ -5,7 +5,7 @@ for diffrerent publishers (RSC, Elsevier, ACS, Wiley, Springer, Nature, Frontier
 
 import extractor_tools as tools
 import section_extractor
-from LimeSoup import (ElsevierSoup, RSCSoup)
+from LimeSoup import ElsevierSoup  # RSCSoup no longer used - RSC now uses a hand-rolled parser, see below
 import json
 from bs4 import BeautifulSoup
 import logging
@@ -92,15 +92,24 @@ def MDPI_to_json(soup, doi, save_dir):
     title = soup.find('h1').text
     tools.create_json_data(doi, sections, title, save_dir)
     
-def RSC_to_json(path, doi, save_dir):
+# Old LimeSoup-based RSC parser (pre-2025 HTML layout, no longer works - RSC moved to Silverchair)
+# def RSC_to_json(path, doi, save_dir):
+#     '''
+#     Function to extract paragraphs from RSC html journals using LimeSoup parser and save as json file
+#     '''
+#     with open(os.path.join(path,doi), 'r', encoding='utf-8') as f:
+#         html_str = f.read()
+#     data = RSCSoup.parse(html_str)
+#     with open(os.path.join(save_dir,doi.replace('.txt', '.json')), 'w', encoding='utf-8') as f:
+#         json.dump(data, f, sort_keys=True, indent=4, ensure_ascii=False)
+
+def RSC_to_json(soup, doi, save_dir):
     '''
-    Function to extract paragraphs from RSC html journals using LimeSoup parser and save as json file
+    Function specific to RSC html journals (Silverchair layout, 2024+) to extract paragraphs and save as json file
     '''
-    with open(os.path.join(path,doi), 'r', encoding='utf-8') as f:
-        html_str = f.read()
-    data = RSCSoup.parse(html_str)
-    with open(os.path.join(save_dir,doi.replace('.txt', '.json')), 'w', encoding='utf-8') as f:
-        json.dump(data, f, sort_keys=True, indent=4, ensure_ascii=False)
+    title = soup.find('meta', attrs={'name': 'citation_title'}).get('content')
+    sections = section_extractor.sections_rsc(soup)
+    tools.create_json_data(doi, sections, title, save_dir)
 
 def Elsevier_to_json(path, doi, save_dir):
     '''
@@ -189,8 +198,8 @@ def article_extractor(doi, path, save_dir):
                 
     elif prefix == pub_prefix['RSC']:
         try:
-            RSC_to_json(path, doi, save_dir)
-        except(AttributeError, StopIteration):
+            RSC_to_json(soup, doi, save_dir)
+        except(AttributeError, IndexError):
             print('Error with file: ', doi)
             return False
             
