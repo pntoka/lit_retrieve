@@ -2,6 +2,7 @@ import os
 import requests
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 import logging
@@ -83,9 +84,13 @@ class FullTextDownloader:
         opts.add_argument("--headless")
         # options.binary_location = r"C:\Program Files (x86)\Mozilla Firefox\firefox.exe"      #stuff for webdriver to work on windows laptop
         # driver = webdriver.Firefox(executable_path=r"C:\Users\Piotr\geckodriver.exe", options=options)
-        if os.path.exists("/snap/firefox/current/usr/lib/firefox/firefox"):
-            opts.binary_location = "/snap/firefox/current/usr/lib/firefox/firefox"
-        driver = webdriver.Firefox(options=opts)
+        # The snap Firefox binary is built against a newer glibc than the host, so it can
+        # only be launched from inside snap confinement. Use the geckodriver shipped with
+        # the snap (which is confined too) and let it locate the binary itself.
+        service = None
+        if os.path.exists("/snap/bin/geckodriver"):
+            service = FirefoxService(executable_path="/snap/bin/geckodriver")
+        driver = webdriver.Firefox(options=opts, service=service)
         driver.get(link)
         driver.implicitly_wait(5)
         page = driver.page_source.encode('utf-8')
