@@ -195,8 +195,10 @@ def main():
             md_content = json_to_md(json_path, include_captions=args.include_captions)
             with open(md_path, 'w', encoding='utf-8') as fh:
                 fh.write(md_content)
-            print(f"  OK  {filename}  →  {md_filename}")
             successful += 1
+            # '->' not an arrow glyph: this goes to the console, which is cp1252
+            # on Windows and cannot encode U+2192
+            print(f"  OK  {filename}  ->  {md_filename}")
         except Exception as exc:
             print(f"FAIL  {filename}  —  {exc}")
             failed.append(filename)
