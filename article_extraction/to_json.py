@@ -11,17 +11,27 @@ from bs4 import BeautifulSoup
 import logging
 import os
 
+# Old ACS parser (pre-2025 Atypon layout, no longer works - ACS moved to Silverchair)
+# def ACS_to_json(soup, doi, save_dir):
+#     '''
+#     Function specific to ACS html journals to extract paragraphs and save as json file
+#     '''
+#     list_remove = [      
+#         {'name':'a'}, #remove links
+#         {'name':'span'}, #remove inline equations
+#     ]
+#     title = soup.find('span', class_='hlFld-Title').text
+#     sections = section_extractor.sections_acs(soup, list_remove)
+#     tools.create_json_data(doi,sections,title,save_dir)
+
 def ACS_to_json(soup, doi, save_dir):
     '''
-    Function specific to ACS html journals to extract paragraphs and save as json file
+    Function specific to ACS html journals (Silverchair layout, 2025+) to extract paragraphs and save as json file
     '''
-    list_remove = [      
-        {'name':'a'}, #remove links
-        {'name':'span'}, #remove inline equations
-    ]
-    title = soup.find('span', class_='hlFld-Title').text
-    sections = section_extractor.sections_acs(soup, list_remove)
-    tools.create_json_data(doi,sections,title,save_dir)
+    title = soup.find('meta', attrs={'name': 'citation_title'}).get('content')
+    title = tools.clean_whitespace(title)   # citation_title carries raw newlines
+    sections = section_extractor.sections_acs(soup)
+    tools.create_json_data(doi, sections, title, save_dir)
 
 def Wiley_to_json(soup, doi, save_dir):
     '''
@@ -108,6 +118,7 @@ def RSC_to_json(soup, doi, save_dir):
     Function specific to RSC html journals (Silverchair layout, 2024+) to extract paragraphs and save as json file
     '''
     title = soup.find('meta', attrs={'name': 'citation_title'}).get('content')
+    title = tools.clean_whitespace(title)   # citation_title carries raw newlines
     sections = section_extractor.sections_rsc(soup)
     tools.create_json_data(doi, sections, title, save_dir)
 

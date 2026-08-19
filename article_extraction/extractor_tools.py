@@ -5,6 +5,22 @@ Helper functions for article extraction such as removing tags and creating json 
 import json
 import os
 
+def clean_whitespace(text):
+    '''
+    Collapse all runs of whitespace in a string to single spaces and strip the ends.
+    Silverchair markup (RSC, ACS) carries raw newlines inside text nodes and inside
+    attribute values such as meta[name=citation_title].
+    '''
+    if text is None:
+        return text
+    return ' '.join(text.split())
+
+def clean_text(element):
+    '''
+    Text of a soup element with all internal whitespace collapsed to single spaces
+    '''
+    return clean_whitespace(element.get_text(' ', strip=True))
+
 def remove_tags_soup_list(soup_list, rules):
     '''
     Function to remove tags from a list of soup objects

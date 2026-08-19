@@ -71,7 +71,7 @@ def _get_captions(soup, publisher):
     """Route to the correct publisher captions extractor. Returns structured caption list."""
     dispatch = {
         "ACS":      captions_extractor.acs_captions,
-        "Frontiers":captions_extractor.acs_captions,   # same HTML pattern
+        "Frontiers":captions_extractor.frontiers_captions,
         "RSC":      captions_extractor.rsc_captions,
         "MDPI":     captions_extractor.mdpi_captions,   # same HTML pattern (RSC moved to a new layout)
         "Nature":   captions_extractor.springer_nature_captions,

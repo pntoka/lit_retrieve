@@ -1,6 +1,8 @@
 from bs4 import BeautifulSoup
 import re
 
+import extractor_tools as tools
+
 def mdpi_captions(soup):
     '''MDPI (old RSC/MDPI shared HTML pattern - RSC moved to a new layout, see rsc_captions below)'''
     captions = []
@@ -26,17 +28,28 @@ def mdpi_captions(soup):
 #     results = structure_figure_captions(captions)
 #     return results
 
-def rsc_captions(soup):
-    '''RSC (Silverchair layout, 2024+)'''
+def _clean_text(element):
+    '''Text of an element with all internal whitespace collapsed to single spaces'''
+    return tools.clean_text(element)
+
+def _silverchair_captions(soup):
+    '''
+    Figure and table captions from the Silverchair layout, shared by RSC (2024+)
+    and ACS (2025+). Only div.fig-section is read, so the duplicate div.fig-modal
+    copy ACS renders for its lightbox is ignored.
+    '''
     captions = []
     for fig in soup.find_all('div', class_='fig-section'):
         if fig.get('data-id') == 'ga':
             continue  # skip graphical/visual abstract
-        label = fig.find('div', class_='fig-label')
+        # ACS carries two labels; the one in graphic-bottom is the one matching the caption
+        label = fig.select_one('div.graphic-bottom div.label.fig-label')
+        if label is None:
+            label = fig.find('div', class_='fig-label')
         cap = fig.find('div', class_='fig-caption')
         if label is None or cap is None:
             continue
-        captions.append(label.get_text(strip=True) + ' ' + cap.get_text(strip=True))
+        captions.append(_clean_text(label) + ' ' + _clean_text(cap))
     for wrap in soup.find_all('div', class_='table-wrap'):
         title = wrap.find('div', class_='table-wrap-title')
         if title is None:
@@ -45,10 +58,18 @@ def rsc_captions(soup):
         cap = title.find('div', class_='caption')
         if label is None or cap is None:
             continue
-        captions.append(label.get_text(strip=True) + ' ' + cap.get_text(strip=True))
+        captions.append(_clean_text(label) + ' ' + _clean_text(cap))
     captions = list(dict.fromkeys(captions))
     results = structure_figure_captions(captions)
     return results
+
+def rsc_captions(soup):
+    '''RSC (Silverchair layout, 2024+)'''
+    return _silverchair_captions(soup)
+
+def acs_captions(soup):
+    '''ACS (Silverchair layout, 2025+)'''
+    return _silverchair_captions(soup)
 
 def tandf_captions(soup):
     captions = []
@@ -58,8 +79,10 @@ def tandf_captions(soup):
     results = structure_figure_captions(captions)
     return results
 
-def acs_captions(soup):
-    '''ACS, Frontiers'''
+# Old ACS captions extractor (pre-2025 Atypon layout, no longer works - ACS moved to
+# Silverchair, see acs_captions above). Frontiers still uses this HTML pattern.
+def frontiers_captions(soup):
+    '''Frontiers (also the pre-2025 ACS Atypon layout)'''
     captions = []
     for fig in soup.find_all('figure', id = True):
         id = fig.get('id')

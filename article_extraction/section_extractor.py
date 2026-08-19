@@ -47,51 +47,54 @@ def subheadings_content_frontiers(list):
             return data
     return data
     
-def sections_acs_letters(soup, list_remove):
-    '''Extract sections from ACS Letters articles'''
-    main_content = soup.find('div', class_= 'article_content')
-    first_paragraph = main_content.find('p')
-    paragraphs = first_paragraph.find_next_siblings('p')
-    paragraphs.insert(0, first_paragraph)
-    paragraphs_text = []
-    for paragraph in paragraphs:
-        paragraph_clean = tools.remove_tags_soup(paragraph, list_remove)
-        paragraphs_text.append(paragraph_clean.text)
-    return paragraphs_text
+# Old ACS parsers (pre-2025 Atypon layout, no longer work - ACS moved to Silverchair,
+# see sections_acs at the bottom of this module)
+# def sections_acs_letters(soup, list_remove):
+#     '''Extract sections from ACS Letters articles'''
+#     main_content = soup.find('div', class_= 'article_content')
+#     first_paragraph = main_content.find('p')
+#     paragraphs = first_paragraph.find_next_siblings('p')
+#     paragraphs.insert(0, first_paragraph)
+#     paragraphs_text = []
+#     for paragraph in paragraphs:
+#         paragraph_clean = tools.remove_tags_soup(paragraph, list_remove)
+#         paragraphs_text.append(paragraph_clean.text)
+#     return paragraphs_text
+#
+# def sections_acs(soup, list_remove):
+#     paragraph_tags = {'name':'div', 'class':['NLM_p last','NLM_p']}
+#     main_content = soup.find('div', class_= 'article_content')
+#     sections = main_content.find_all('div', class_='NLM_sec NLM_sec_level_1')
+#     if sections == []:
+#         data_dict = sections_acs_letters(soup, list_remove)
+#         return data_dict
+#     data_dict = []
+#     for section in sections:
+#         data = {}
+#         data['name'] = section.find('h2').text
+#         data['type'] = 'h2'
+#         data['content'] = []
+#         if section.find('div', class_ = 'NLM_sec NLM_sec_level_2') is not None:
+#             elements = section.find_all('div', class_ = 'NLM_sec NLM_sec_level_2')
+#             for element in elements:
+#                 data_sub = {}    
+#                 data_sub['name'] = element.find('h3').text
+#                 data_sub['type'] = 'h3'
+#                 data_sub['content'] = []
+#                 paragraphs = tools.find_paragraphs(element, paragraph_tags)
+#                 paragraphs = tools.remove_tags_soup_list(paragraphs, list_remove)
+#                 for paragraph in paragraphs:
+#                     data_sub['content'].append(paragraph.text)
+#                 data['content'].append(data_sub)
+#         else:
+#             paragraphs = tools.find_paragraphs(section, paragraph_tags)
+#             paragraphs = tools.remove_tags_soup_list(paragraphs, list_remove)
+#             for paragraph in paragraphs:
+#                 data['content'].append(paragraph.text)
+#         data_dict.append(data)
+#     return data_dict
 
-def sections_acs(soup, list_remove):
-    paragraph_tags = {'name':'div', 'class':['NLM_p last','NLM_p']}
-    main_content = soup.find('div', class_= 'article_content')
-    sections = main_content.find_all('div', class_='NLM_sec NLM_sec_level_1')
-    if sections == []:
-        data_dict = sections_acs_letters(soup, list_remove)
-        return data_dict
-    data_dict = []
-    for section in sections:
-        data = {}
-        data['name'] = section.find('h2').text
-        data['type'] = 'h2'
-        data['content'] = []
-        if section.find('div', class_ = 'NLM_sec NLM_sec_level_2') is not None:
-            elements = section.find_all('div', class_ = 'NLM_sec NLM_sec_level_2')
-            for element in elements:
-                data_sub = {}    
-                data_sub['name'] = element.find('h3').text
-                data_sub['type'] = 'h3'
-                data_sub['content'] = []
-                paragraphs = tools.find_paragraphs(element, paragraph_tags)
-                paragraphs = tools.remove_tags_soup_list(paragraphs, list_remove)
-                for paragraph in paragraphs:
-                    data_sub['content'].append(paragraph.text)
-                data['content'].append(data_sub)
-        else:
-            paragraphs = tools.find_paragraphs(section, paragraph_tags)
-            paragraphs = tools.remove_tags_soup_list(paragraphs, list_remove)
-            for paragraph in paragraphs:
-                data['content'].append(paragraph.text)
-        data_dict.append(data)
-    return data_dict
-    
+
 def sections_wiley(soup, list_remove):
     '''
     Function to get sections from Wiley xml journals
@@ -443,26 +446,49 @@ def sections_mdpi(soup, list_remove):
             break
     return data_dict
 
-_RSC_EXCLUDE_HEADING_CLASSES = {
+# --- Silverchair layout (RSC 2024+, ACS 2025+) -------------------------------
+# Both publishers now serve the same Silverchair template: flat h2/h3 headings,
+# each followed by a sibling content div whose children are
+# div.article-section-wrapper, each holding a single <p>, figure or table.
+
+_SILVERCHAIR_EXCLUDE_HEADING_CLASSES = {
+    'abstract-title',
+    'graphical-abstract-label',
     'backacknowledgements-title',
+    'backnotes-title',
     'backreferences-title',
     'dataavailabilitystatement-title',
 }
-_RSC_EXCLUDE_HEADING_TEXT = re.compile(
-    r'^(acknowledge?ments?|(notes and )?references?|author contributions?|conflicts? of interest|data availability( statement)?)$',
+_SILVERCHAIR_EXCLUDE_HEADING_TEXT = re.compile(
+    r'^((visual )?abstract|acknowledge?ments?|(notes and )?references?|author contributions?'
+    r'|conflicts? of interest|data availability( statement)?|associated content'
+    r'|supporting information|supplementary (material|information))$',
     re.IGNORECASE
 )
 
-def _rsc_excluded_heading(heading):
-    '''Back-matter headings (acknowledgements, references, etc.) to exclude from RSC sections'''
-    if _RSC_EXCLUDE_HEADING_CLASSES & set(heading.get('class', [])):
-        return True
-    return bool(_RSC_EXCLUDE_HEADING_TEXT.match(heading.get_text(strip=True)))
+_SILVERCHAIR_METADATA_CLASSES = {
+    'article-metadata-panel',
+    'article-metadata-standalone-panel',
+}
 
-def _rsc_paragraphs(content_div):
+
+def _silverchair_excluded_heading(heading):
+    '''Back-matter headings (acknowledgements, references, etc.) to exclude from sections'''
+    if _SILVERCHAIR_EXCLUDE_HEADING_CLASSES & set(heading.get('class', [])):
+        return True
+    return bool(_SILVERCHAIR_EXCLUDE_HEADING_TEXT.match(_clean_text(heading)))
+
+
+def _clean_text(element):
+    '''Text of an element with all internal whitespace collapsed to single spaces'''
+    return tools.clean_text(element)
+
+
+def _silverchair_paragraphs(content_div):
     '''
     Extract paragraph text from the article-section-wrapper children of a heading's
-    content div, skipping wrappers that hold a figure or table (handled separately)
+    content div, skipping wrappers that hold a figure, table or reference list
+    (handled separately)
     '''
     texts = []
     for wrapper in content_div.find_all('div', class_='article-section-wrapper', recursive=False):
@@ -470,41 +496,45 @@ def _rsc_paragraphs(content_div):
             continue
         if wrapper.find('div', class_='table-wrap') is not None:
             continue
-        for p in wrapper.find_all('p', recursive=False):
-            text = p.get_text(strip=True)
+        if wrapper.find('div', class_='ref-list') is not None:
+            continue
+        paragraphs = wrapper.find_all('p', recursive=False)
+        # ACS wraps paragraphs containing a display equation in div.block-child-p
+        paragraphs += wrapper.find_all('div', class_='block-child-p', recursive=False)
+        for p in paragraphs:
+            text = _clean_text(p)
             if text:
                 texts.append(text)
     return texts
 
-def sections_rsc(soup):
-    '''
-    Function to extract sections from RSC html journals (Silverchair layout, 2024+).
-    Main content sits between div.article-metadata-panel and
-    div.permissionstatement-section-wrapper; h2/h3 headings are flat siblings each
-    followed by a sibling content div, so nesting is inferred from document order.
-    '''
-    metadata_panel = soup.find('div', class_='article-metadata-panel')
-    permission_wrapper = soup.find('div', class_='permissionstatement-section-wrapper')
-    parent = metadata_panel.parent
-    children = [c for c in parent.children if getattr(c, 'name', None) is not None]
-    start = children.index(metadata_panel)
-    end = children.index(permission_wrapper)
-    relevant = children[start + 1:end]
 
+def _silverchair_range(container, start_node, end_node):
+    '''Element children of container strictly between start_node and end_node'''
+    children = [c for c in container.children if getattr(c, 'name', None) is not None]
+    start = children.index(start_node)
+    end = children.index(end_node)
+    return children[start + 1:end]
+
+
+def _sections_silverchair(nodes):
+    '''
+    Walk a flat run of h2/h3 headings and their sibling content divs, inferring
+    nesting from document order
+    '''
     data_dict = []
     current_h2 = None
     current_h3 = None
     skip_current = False
 
-    for node in relevant:
+    for node in nodes:
         if node.name in ('h2', 'h3'):
-            skip_current = _rsc_excluded_heading(node)
+            skip_current = _silverchair_excluded_heading(node)
             if skip_current:
                 current_h3 = None
                 if node.name == 'h2':
                     current_h2 = None
                 continue
-            section = {'name': node.get_text(strip=True), 'type': node.name, 'content': []}
+            section = {'name': _clean_text(node), 'type': node.name, 'content': []}
             if node.name == 'h2':
                 data_dict.append(section)
                 current_h2 = section
@@ -520,9 +550,9 @@ def sections_rsc(soup):
                 # standalone highlight box before any heading (e.g. "Broader context")
                 box_heading = node.find('h3', class_='title')
                 if box_heading is not None:
-                    section = {'name': box_heading.get_text(strip=True), 'type': 'h3', 'content': []}
+                    section = {'name': _clean_text(box_heading), 'type': 'h3', 'content': []}
                     for p in box_heading.find_next_siblings('p'):
-                        text = p.get_text(strip=True)
+                        text = _clean_text(p)
                         if text:
                             section['content'].append(text)
                     data_dict.append(section)
@@ -530,6 +560,51 @@ def sections_rsc(soup):
             target = current_h3 if current_h3 is not None else current_h2
             if target is None:
                 continue
-            target['content'].extend(_rsc_paragraphs(node))
+            target['content'].extend(_silverchair_paragraphs(node))
 
     return data_dict
+
+
+def sections_rsc(soup):
+    '''
+    Function to extract sections from RSC html journals (Silverchair layout, 2024+).
+    Main content sits between div.article-metadata-panel and
+    div.permissionstatement-section-wrapper; h2/h3 headings are flat siblings each
+    followed by a sibling content div, so nesting is inferred from document order.
+    '''
+    metadata_panel = soup.find('div', class_='article-metadata-panel')
+    permission_wrapper = soup.find('div', class_='permissionstatement-section-wrapper')
+    nodes = _silverchair_range(metadata_panel.parent, metadata_panel, permission_wrapper)
+    return _sections_silverchair(nodes)
+
+
+def sections_acs(soup):
+    '''
+    Function to extract sections from ACS html journals (Silverchair layout, 2025+).
+    Main content sits between the article metadata panel (article-metadata-panel or
+    article-metadata-standalone-panel) and div.permissionstatement-section-wrapper,
+    inside the ArticleFulltext widget. Same flat h2/h3 layout as RSC.
+    '''
+    permission_wrapper = soup.find('div', class_='permissionstatement-section-wrapper')
+    container = soup.select_one(
+        "div.widget-ArticleFulltext div.widget-items[data-widgetname='ArticleFulltext']"
+    )
+    if container is None:
+        container = permission_wrapper.parent
+    children = [c for c in container.children if getattr(c, 'name', None) is not None]
+    metadata_panels = [
+        c for c in children
+        if c.name == 'div' and _SILVERCHAIR_METADATA_CLASSES & set(c.get('class', []))
+    ]
+    # the populated panel sits after the abstract; take the last one present
+    nodes = _silverchair_range(container, metadata_panels[-1], permission_wrapper)
+
+    data_dict = _sections_silverchair(nodes)
+    if data_dict:
+        return data_dict
+    # Letters and similar articles carry no headings - return a flat list of paragraphs
+    paragraphs = []
+    for node in nodes:
+        if node.name == 'div':
+            paragraphs.extend(_silverchair_paragraphs(node))
+    return paragraphs

@@ -42,37 +42,39 @@ def science_figure(soup: BeautifulSoup, labels: list[str]) -> list[str]:
             urls.append(url)
     return urls
 
-def acs_figure(soup, figure_labels: list[str]) -> list[str | None]:
-    urls = []
-    
-    for label in figure_labels:
-        # Extract number from label (e.g., 'Fig. 1' -> '1', 'Scheme 2' -> '2')
-        match = re.search(r'\d+', label)
-        if not match:
-            continue
-        
-        num = match.group()
-        src = None
-        
-        # Determine if it's a Scheme or Figure and set the id accordingly
-        if 'scheme' in label.lower():
-            fig_id = f'sch{num}'
-        elif 'fig' in label.lower():
-            fig_id = f'fig{num}'
-        else:
-            continue
-        
-        # Find the figure element by id
-        figure = soup.find('figure', id=fig_id)
-        if figure:
-            img = figure.find('img')
-            if img:
-                src = img.get('data-lg-src')
-                src = urljoin('https://pubs.acs.org', src)
-        
-        urls.append(src)
-    
-    return urls
+# Old ACS figure extractor (pre-2025 Atypon layout, no longer works - ACS moved to
+# Silverchair, see acs_figure below)
+# def acs_figure(soup, figure_labels: list[str]) -> list[str | None]:
+#     urls = []
+#
+#     for label in figure_labels:
+#         # Extract number from label (e.g., 'Fig. 1' -> '1', 'Scheme 2' -> '2')
+#         match = re.search(r'\d+', label)
+#         if not match:
+#             continue
+#
+#         num = match.group()
+#         src = None
+#
+#         # Determine if it's a Scheme or Figure and set the id accordingly
+#         if 'scheme' in label.lower():
+#             fig_id = f'sch{num}'
+#         elif 'fig' in label.lower():
+#             fig_id = f'fig{num}'
+#         else:
+#             continue
+#
+#         # Find the figure element by id
+#         figure = soup.find('figure', id=fig_id)
+#         if figure:
+#             img = figure.find('img')
+#             if img:
+#                 src = img.get('data-lg-src')
+#                 src = urljoin('https://pubs.acs.org', src)
+#
+#         urls.append(src)
+#
+#     return urls
 
 # Old RSC figure extractor (pre-2025 HTML layout, no longer works - RSC moved to Silverchair).
 # def rsc_figure(soup, labels: list[str]) -> list[str | None]:
@@ -107,8 +109,30 @@ def acs_figure(soup, figure_labels: list[str]) -> list[str | None]:
 #             continue
 #     return urls
 
-def rsc_figure(soup, labels: list[str]) -> list[str | None]:
-    '''RSC (Silverchair layout, 2024+)'''
+def _silverchair_hires_url(figure):
+    '''
+    Full-resolution image URL from a Silverchair "Download to Slide" link. The href
+    points at the DownloadImage endpoint and carries the signed full-size PNG URL in
+    its image= parameter, while img[data-src] only gives the m_-prefixed medium
+    version. The image= value contains unescaped & separators of its own, so it is
+    sliced out by hand rather than with parse_qs, which would truncate the signature.
+    '''
+    link = figure.find('a', class_='download-slide')
+    if link is None or not link.get('href'):
+        return None
+    href = link['href']
+    if href.startswith('//'):
+        href = 'https:' + href
+    match = re.search(r'[?&]image=(.*?)(?:&sec=|&ar=|&xsltPath=|&siteId=|$)', href)
+    if not match or not match.group(1):
+        return None
+    return match.group(1)
+
+def _silverchair_figure(soup, labels: list[str]) -> list[str | None]:
+    '''
+    Figure image URLs from the Silverchair layout, shared by RSC (2024+) and ACS (2025+).
+    Figures are keyed by data-id (fig1, sch1, ...) on div.fig-section.
+    '''
     urls = []
 
     for label in labels:
@@ -130,12 +154,22 @@ def rsc_figure(soup, labels: list[str]) -> list[str | None]:
         figure = soup.find('div', class_='fig-section', attrs={'data-id': data_id})
         src = None
         if figure:
-            img = figure.find('img')
-            if img:
-                src = img.get('data-src')
+            src = _silverchair_hires_url(figure)
+            if src is None:
+                img = figure.find('img')
+                if img:
+                    src = img.get('data-src')
         urls.append(src)
 
     return urls
+
+def rsc_figure(soup, labels: list[str]) -> list[str | None]:
+    '''RSC (Silverchair layout, 2024+)'''
+    return _silverchair_figure(soup, labels)
+
+def acs_figure(soup, labels: list[str]) -> list[str | None]:
+    '''ACS (Silverchair layout, 2025+)'''
+    return _silverchair_figure(soup, labels)
 
 def wiley_process_figure_labels(labels):
     '''Function to create the correct fig and scheme ids from fig labels'''

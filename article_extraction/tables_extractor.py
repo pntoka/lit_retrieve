@@ -54,8 +54,12 @@ def springer_table(soup)->list[dict]:
 #
 #     return table_list
 
-def rsc_table(soup):
-    '''RSC (Silverchair layout, 2024+)'''
+def _silverchair_table(soup):
+    '''
+    Tables from the Silverchair layout, shared by RSC (2024+) and ACS (2025+).
+    Only div.table-overflow is read, so the aria-hidden duplicate ACS renders
+    inside div.table-modal is ignored.
+    '''
     table_list = []
     for wrap in soup.find_all('div', class_='table-wrap'):
         title = wrap.find('div', class_='table-wrap-title')
@@ -67,18 +71,28 @@ def rsc_table(soup):
         table_list.append({'label': label, 'content': str(table_el)})
     return table_list
 
-def acs_table(soup):
-    tables = soup.find_all('table', class_='table')
-    table_list = []
-    for table in tables:
-        table_dict = {}
-        label = table.find_parent('div', class_='NLM_table-wrap').get('id')
-        table_dict['label'] = label
-        text = str(table)
-        table_dict['content'] = text
-        table_list.append(table_dict)
+def rsc_table(soup):
+    '''RSC (Silverchair layout, 2024+)'''
+    return _silverchair_table(soup)
 
-    return table_list
+def acs_table(soup):
+    '''ACS (Silverchair layout, 2025+)'''
+    return _silverchair_table(soup)
+
+# Old ACS table extractor (pre-2025 Atypon layout, no longer works - ACS moved to
+# Silverchair, see acs_table above)
+# def acs_table(soup):
+#     tables = soup.find_all('table', class_='table')
+#     table_list = []
+#     for table in tables:
+#         table_dict = {}
+#         label = table.find_parent('div', class_='NLM_table-wrap').get('id')
+#         table_dict['label'] = label
+#         text = str(table)
+#         table_dict['content'] = text
+#         table_list.append(table_dict)
+#
+#     return table_list
 
 def science_table(soup):
     tables = soup.find_all('table')
