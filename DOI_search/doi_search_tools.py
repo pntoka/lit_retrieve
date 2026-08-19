@@ -134,6 +134,26 @@ def doi_unique(query_list, save_dir):
             save_file.write(doi + "\n")
 
 
+def doi_filter_query_results(query_list, save_dir, prefix_list):
+    """
+    Function that goes through search results for different queries and saves a list of filtered DOIs in a file
+    """
+    for query in query_list:
+        folder = os.path.join(save_dir, list(query.keys())[0])
+        if os.path.exists(os.path.join(folder, "doi_all.txt")) is False:
+            continue
+        else:
+            with open(os.path.join(folder, "doi_all.txt"), "r", encoding="utf-8") as file:
+                dois = file.read().splitlines()
+            filtered_dois = []
+            for doi in dois:
+                if doi.startswith(tuple(prefix_list)):
+                    filtered_dois.append(doi)
+            with open(os.path.join(folder, "doi_filtered.txt"), "a", encoding="utf-8") as save_file:
+                for doi in filtered_dois:
+                    save_file.write(doi + "\n")
+
+
 def parse_query(query_file):
     with open(query_file, "rb") as file:
         query_data = tomllib.load(file)
